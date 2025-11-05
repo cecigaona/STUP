@@ -3,11 +3,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Menu, X, Send } from "lucide-react";
 
-export default function Dashboard({ userName }: { userName: string }) {
+export default function Page() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<"home" | "search" | "portfolio">("home");
 
-  // Chat
+  // Username (hidrata desde localStorage si existe)
+  const [userName, setUserName] = useState<string>("User");
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("userName");
+      if (stored) setUserName(stored);
+    } catch {}
+  }, []);
+
+  // ---------------- Chat ----------------
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
   const [chatMessages, setChatMessages] = useState<Array<{ id: number; text: string; isUser: boolean }>>([
@@ -15,40 +24,91 @@ export default function Dashboard({ userName }: { userName: string }) {
     { id: 2, text: "Lorem ipsum dolor sit amet, consectetur", isUser: true },
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  // Funds modal
-  const [isFundsModalOpen, setIsFundsModalOpen] = useState(false);
-  const [fundsAction, setFundsAction] = useState<"add" | "withdraw">("add");
-  const [order, setOrder] = useState<{ stock: string; quantity: number }>({ stock: "", quantity: 1 });
-  const [orderSubmitted, setOrderSubmitted] = useState<string | null>(null);
-
-  const toggleMenu = () => setIsMenuOpen((v) => !v);
-  const navigateTo = (page: "home" | "search" | "portfolio") => {
-    setCurrentPage(page);
-    setIsMenuOpen(false);
-  };
-
-  const openChat = () => setIsChatOpen(true);
-  const closeChat = () => setIsChatOpen(false);
-
   const sendMessage = () => {
-    if (chatMessage.trim()) {
-      setChatMessages((prev) => [...prev, { id: prev.length + 1, text: chatMessage, isUser: true }]);
-      setChatMessage("");
-    }
+    if (!chatMessage.trim()) return;
+    setChatMessages((prev) => [...prev, { id: prev.length + 1, text: chatMessage, isUser: true }]);
+    setChatMessage("");
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") sendMessage();
   };
-
-  // auto-scroll to last message
   useEffect(() => {
-    if (isChatOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    if (isChatOpen) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [isChatOpen, chatMessages]);
 
-  // Funds modal helpers
+  // --- Drag en md+ / bottom sheet en móvil ---
+  const chatRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const dragState = useRef<{ startX: number; startY: number; baseX: number; baseY: number; dragging: boolean }>({
+    startX: 0, startY: 0, baseX: 0, baseY: 0, dragging: false,
+  });
+
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(min-width: 768px)");
+    const upd = () => setIsDesktop(q.matches);
+    upd();
+    q.addEventListener("change", upd);
+    return () => q.removeEventListener("change", upd);
+  }, []);
+
+  function clampToViewport(nx: number, ny: number) {
+    const el = chatRef.current;
+    if (!el) return { x: nx, y: ny };
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const rect = el.getBoundingClientRect();
+    const minX = -rect.left + pad + pos.x;
+    const maxX = vw - rect.right - pad + pos.x;
+    const minY = -rect.top + pad + pos.y;
+    const maxY = vh - rect.bottom - pad + pos.y;
+    return { x: Math.min(Math.max(nx, minX), maxX), y: Math.min(Math.max(ny, minY), maxY) };
+  }
+
+  function onDragStart(e: React.MouseEvent | React.TouchEvent) {
+    if (!isDesktop) return;
+    dragState.current.dragging = true;
+    const p = "touches" in e ? e.touches[0] : (e as React.MouseEvent);
+    dragState.current.startX = p.clientX;
+    dragState.current.startY = p.clientY;
+    dragState.current.baseX = pos.x;
+    dragState.current.baseY = pos.y;
+    document.body.style.userSelect = "none";
+  }
+  function onDragMove(e: MouseEvent | TouchEvent) {
+    if (!dragState.current.dragging) return;
+    const p = "touches" in e ? e.touches[0] : (e as MouseEvent);
+    const dx = p.clientX - dragState.current.startX;
+    const dy = p.clientY - dragState.current.startY;
+    setPos(clampToViewport(dragState.current.baseX + dx, dragState.current.baseY + dy));
+  }
+  function onDragEnd() {
+    if (!dragState.current.dragging) return;
+    dragState.current.dragging = false;
+    document.body.style.userSelect = "";
+  }
+  useEffect(() => {
+    const move = (ev: MouseEvent) => onDragMove(ev);
+    const tmove = (ev: TouchEvent) => onDragMove(ev);
+    const up = () => onDragEnd();
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    window.addEventListener("touchmove", tmove, { passive: false });
+    window.addEventListener("touchend", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchmove", tmove);
+      window.removeEventListener("touchend", up);
+    };
+  }, [isDesktop, pos.x, pos.y]);
+
+  // ---------------- Funds modal ----------------
+  const [isFundsModalOpen, setIsFundsModalOpen] = useState(false);
+  const [fundsAction, setFundsAction] = useState<"add" | "withdraw">("add");
+  const [order, setOrder] = useState<{ stock: string; quantity: number }>({ stock: "", quantity: 1 });
+  const [orderSubmitted, setOrderSubmitted] = useState<string | null>(null);
   const openFundsModal = (action: "add" | "withdraw") => {
     setFundsAction(action);
     setOrder({ stock: "", quantity: 1 });
@@ -62,12 +122,11 @@ export default function Dashboard({ userName }: { userName: string }) {
       return;
     }
     setOrderSubmitted(
-      `${fundsAction === "add" ? "Added" : "Withdrew"} ${order.quantity} ${
-        order.quantity === 1 ? "share" : "shares"
-      } of ${order.stock}.`
+      `${fundsAction === "add" ? "Added" : "Withdrew"} ${order.quantity} ${order.quantity === 1 ? "share" : "shares"} of ${order.stock}.`
     );
   };
 
+  // ---------------- Data ----------------
   const stockData = [
     { name: "TechCorp", price: "$150.25", change: "+2.5%", volume: "1.2M", isPositive: true },
     { name: "Innovate Solutions", price: "$220.50", change: "-1.8%", volume: "850K", isPositive: false },
@@ -78,17 +137,14 @@ export default function Dashboard({ userName }: { userName: string }) {
 
   return (
     <div className="min-h-screen bg-[#F3E7D2] relative">
-      {/* Burger Button */}
+      {/* Burger */}
       <div className="absolute top-6 left-6 z-50">
-        <button
-          onClick={toggleMenu}
-          className="p-2 text-[#145147] hover:bg-white/20 rounded-lg transition-all duration-200"
-        >
+        <button onClick={() => setIsMenuOpen((v) => !v)} className="p-2 text-[#145147] hover:bg-white/20 rounded-lg">
           {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      {/* Slide-out Navigation */}
+      {/* Drawer */}
       <div
         className={`fixed top-0 left-0 h-full w-80 bg-[#145147] text-white transform transition-transform duration-300 ease-in-out z-40 ${
           isMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -98,45 +154,56 @@ export default function Dashboard({ userName }: { userName: string }) {
           <h2 className="text-2xl font-bold mb-8">STUP</h2>
           <nav className="space-y-4">
             <button
-              onClick={() => navigateTo("home")}
-              className={`w-full text-left p-4 rounded-lg transition-all duration-200 ${
-                currentPage === "home" ? "bg-white/20" : "hover:bg-white/10"
-              }`}
+              onClick={() => {
+                setCurrentPage("home");
+                setIsMenuOpen(false);
+              }}
+              className={`w-full text-left p-4 rounded-lg ${currentPage === "home" ? "bg-white/20" : "hover:bg-white/10"}`}
             >
               Home Page
             </button>
             <button
-              onClick={() => navigateTo("search")}
-              className={`w-full text-left p-4 rounded-lg transition-all duration-200 ${
-                currentPage === "search" ? "bg-white/20" : "hover:bg-white/10"
-              }`}
+              onClick={() => {
+                setCurrentPage("search");
+                setIsMenuOpen(false);
+              }}
+              className={`w-full text-left p-4 rounded-lg ${currentPage === "search" ? "bg-white/20" : "hover:bg-white/10"}`}
             >
               Search Stocks
             </button>
             <button
-              onClick={() => navigateTo("portfolio")}
-              className={`w-full text-left p-4 rounded-lg transition-all duration-200 ${
-                currentPage === "portfolio" ? "bg-white/20" : "hover:bg-white/10"
-              }`}
+              onClick={() => {
+                setCurrentPage("portfolio");
+                setIsMenuOpen(false);
+              }}
+              className={`w-full text-left p-4 rounded-lg ${currentPage === "portfolio" ? "bg-white/20" : "hover:bg-white/10"}`}
             >
               Portfolio Actions
             </button>
           </nav>
         </div>
       </div>
-
       {isMenuOpen && <div className="fixed inset-0 bg-black/20 z-30" onClick={() => setIsMenuOpen(false)} />}
 
-      {/* Chat Panel */}
+      {/* Chat Panel (draggable en md+, bottom sheet en móvil) */}
       {isChatOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[480px] bg-[#145147] rounded-2xl shadow-2xl z-[60] flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-white/20">
+        <div
+          ref={chatRef}
+          className={`
+            fixed z-[60] flex flex-col bg-[#145147] 
+            md:w-96 md:h-[480px] md:rounded-2xl md:bottom-6 md:right-6
+            w-full h-[70vh] bottom-0 inset-x-0 md:inset-auto
+            shadow-2xl
+          `}
+          style={isDesktop ? { transform: `translate(${pos.x}px, ${pos.y}px)` } : undefined}
+        >
+          <div
+            className="flex items-center justify-between p-4 border-b border-white/20 md:cursor-move select-none"
+            onMouseDown={onDragStart}
+            onTouchStart={onDragStart}
+          >
             <h3 className="text-white text-lg font-semibold">Chat</h3>
-            <button
-              onClick={closeChat}
-              className="text-white/70 hover:text-white transition-colors duration-200"
-              aria-label="Close chat"
-            >
+            <button onClick={() => setIsChatOpen(false)} className="text-white/70 hover:text-white" aria-label="Close chat">
               <X size={20} />
             </button>
           </div>
@@ -168,11 +235,7 @@ export default function Dashboard({ userName }: { userName: string }) {
                 onKeyDown={handleKeyDown}
                 className="flex-1 bg-transparent text-gray-700 placeholder-gray-500 outline-none"
               />
-              <button
-                onClick={sendMessage}
-                className="ml-2 text-[#145147] hover:text-[#0f3d37] transition-colors duration-200"
-                aria-label="Send message"
-              >
+              <button onClick={sendMessage} className="ml-2 text-[#145147] hover:text-[#0f3d37]" aria-label="Send message">
                 <Send size={18} />
               </button>
             </div>
@@ -180,14 +243,12 @@ export default function Dashboard({ userName }: { userName: string }) {
         </div>
       )}
 
-      {/* Chat FAB — hidden while chat is open */}
+      {/* FAB */}
       {!isChatOpen && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
-            onClick={openChat}
-            className="w-12 h-12 bg-[#145147] text-white rounded-full flex items-center justify-center
-                       hover:bg-[#0f3d37] transition-all duration-200 shadow-lg hover:shadow-xl
-                       transform hover:scale-105"
+            onClick={() => setIsChatOpen(true)}
+            className="w-12 h-12 bg-[#145147] text-white rounded-full flex items-center justify-center hover:bg-[#0f3d37] shadow-lg"
             aria-label="Open chat"
           >
             <span className="text-sm font-bold">IA</span>
@@ -195,13 +256,13 @@ export default function Dashboard({ userName }: { userName: string }) {
         </div>
       )}
 
-      {/* ----------------- Content Area ----------------- */}
-      <div className="pt-20 px-6 pb-6">
+      {/* ----------------- Content ----------------- */}
+      <div className="pt-20 px-4 sm:px-6 lg:px-8 pb-6">
         {currentPage === "home" && (
           <>
-            {/* Welcome Message */}
+            {/* Welcome */}
             <div className="mb-8">
-              <h1 className="text-[#145147] text-4xl font-bold leading-tight">
+              <h1 className="text-[#145147] text-3xl sm:text-4xl font-bold leading-tight">
                 Welcome Back,
                 <br />
                 {userName}
@@ -228,7 +289,7 @@ export default function Dashboard({ userName }: { userName: string }) {
               </div>
             </div>
 
-            {/* Stocks Table */}
+            {/* Stocks Table (con colores originales) */}
             <div className="bg-[#F3E7D2] rounded-2xl overflow-hidden shadow-xl border border-gray-200">
               <div className="bg-[#145147] px-6 py-4">
                 <div className="grid grid-cols-5 gap-4 text-white font-medium">
@@ -298,7 +359,7 @@ export default function Dashboard({ userName }: { userName: string }) {
               </div>
             </div>
 
-            {/* Key Stats Table */}
+            {/* Key Stats Table (colores originales) */}
             <div className="bg-[#F3E7D2] rounded-2xl overflow-hidden shadow-xl border border-gray-200">
               <div className="bg-[#2a3a3a] px-6 py-4">
                 <h2 className="text-white text-xl font-bold">Key Stats</h2>
@@ -365,12 +426,12 @@ export default function Dashboard({ userName }: { userName: string }) {
               </div>
             </div>
 
-            {/* Popular Stocks Section */}
+            {/* Popular Stocks */}
             <div className="mb-8">
               <div className="bg-[#2a3a3a] rounded-lg p-6 mb-6">
                 <h2 className="text-white text-xl font-bold mb-6">Popular</h2>
 
-                <div className="grid grid-cols-5 gap-4 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
                   {[
                     "Tech Innovators Inc.",
                     "Global Retail Group",
@@ -398,7 +459,7 @@ export default function Dashboard({ userName }: { userName: string }) {
               </div>
             </div>
 
-            {/* Your Portfolio Section */}
+            {/* Your Portfolio */}
             <div className="bg-[#F3E7D2] rounded-2xl overflow-hidden shadow-xl border border-gray-200 mb-8">
               <div className="bg-[#2a3a3a] px-6 py-4">
                 <h2 className="text-white text-xl font-bold">Your Portfolio</h2>
@@ -438,28 +499,17 @@ export default function Dashboard({ userName }: { userName: string }) {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
               <button
                 onClick={() => openFundsModal("withdraw")}
-                className="px-8 py-3 bg-white/80 backdrop-blur-sm text-gray-700 rounded-full text-lg font-medium
-                           hover:bg-white hover:shadow-lg active:bg-gray-50
-                           focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-[#F3E7D2]
-                           transition-all duration-300 ease-in-out
-                           shadow-md hover:shadow-xl active:shadow-sm
-                           transform hover:-translate-y-0.5 active:translate-y-0
-                           border border-gray-200/50"
+                className="px-8 py-3 bg-white/80 backdrop-blur-sm text-gray-700 rounded-full text-lg font-medium hover:bg-white border border-gray-200/50"
               >
                 Withdraw Funds
               </button>
 
               <button
                 onClick={() => openFundsModal("add")}
-                className="px-8 py-3 bg-[#153832] text-white rounded-full text-lg font-medium
-                           hover:bg-[#0f2a26] active:bg-[#0a1f1c] 
-                           focus:outline-none focus:ring-2 focus:ring-[#153832]/50 focus:ring-offset-2 focus:ring-offset-[#F3E7D2]
-                           transition-all duration-300 ease-in-out
-                           shadow-lg hover:shadow-xl active:shadow-md
-                           transform hover:-translate-y-0.5 active:translate-y-0"
+                className="px-8 py-3 bg-[#153832] text-white rounded-full text-lg font-medium hover:bg-[#0f2a26]"
               >
                 Add Funds
               </button>

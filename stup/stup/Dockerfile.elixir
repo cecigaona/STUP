@@ -1,0 +1,22 @@
+FROM elixir:1.17.2-otp-26
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git curl ca-certificates nodejs npm inotify-tools \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV MIX_ENV=dev LANG=C.UTF-8
+
+RUN mix local.hex --force && mix local.rebar --force
+
+COPY mix.exs mix.lock ./
+COPY config ./config
+RUN mix deps.get && mix deps.compile
+
+COPY . .
+
+ENV PHX_SERVER=true
+ENV FILE_SYSTEM_BACKEND=fs_poll
+
+EXPOSE 4000
+CMD ["/bin/bash", "-lc", "mix deps.get && mix phx.server"]

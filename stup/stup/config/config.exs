@@ -7,6 +7,19 @@
 # General application configuration
 import Config
 
+config :stup, :scopes,
+  user: [
+    default: true,
+    module: Stup.Accounts.Scope,
+    assign_key: :current_scope,
+    access_path: [:user, :id],
+    schema_key: :user_id,
+    schema_type: :binary_id,
+    schema_table: :users,
+    test_data_fixture: Stup.AccountsFixtures,
+    test_setup_helper: :register_and_log_in_user
+  ]
+
 config :stup,
   ecto_repos: [Stup.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]

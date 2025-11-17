@@ -45,6 +45,22 @@ defmodule Stup.Accounts do
   end
 
   @doc """
+  Authenticates a user by email and password and returns an API token on success.
+
+  Returns {:ok, user, token} when credentials are valid, or {:error, :invalid_credentials}.
+  """
+  def authenticate_user(email, password) when is_binary(email) and is_binary(password) do
+    case get_user_by_email_and_password(email, password) do
+      %User{} = user ->
+        token = create_user_api_token(user)
+        {:ok, user, token}
+
+      _ ->
+        {:error, :invalid_credentials}
+    end
+  end
+
+  @doc """
   Gets a single user.
 
   Raises `Ecto.NoResultsError` if the User does not exist.

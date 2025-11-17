@@ -55,7 +55,14 @@ defmodule StupWeb.Router do
   scope "/api", StupWeb do
     pipe_through [:api]
 
-    post "/users", UserRegistrationApiController, :create
+    post "/users/register", UserRegistrationApiController, :create
+    post "/users/login", UserRegistrationApiController, :login
+  end
+
+  scope "/api", StupWeb do
+    pipe_through [:fetch_current_scope_for_api_user]
+
+    get "/users/me", UserSessionApiController, :get
   end
 
   scope "/", StupWeb do

@@ -80,6 +80,12 @@ defmodule Stup.Accounts do
     |> Repo.insert()
   end
 
+  def register_user_with_password(attrs) do
+    %User{}
+    |> User.registration_changeset(attrs)
+    |> Repo.insert()
+  end
+
   ## Settings
 
   @doc """

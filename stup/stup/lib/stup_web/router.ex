@@ -52,6 +52,12 @@ defmodule StupWeb.Router do
 
   ## Authentication routes
 
+  scope "/api", StupWeb do
+    pipe_through [:api]
+
+    post "/users", UserRegistrationApiController, :create
+  end
+
   scope "/", StupWeb do
     pipe_through [:browser, :redirect_if_user_is_authenticated]
 

@@ -133,4 +133,13 @@ defmodule Stup.Accounts.User do
     Bcrypt.no_user_verify()
     false
   end
+
+  def registration_changeset(user, attrs, opts \\ []) do
+    changeset =
+      user
+      |> cast(attrs, [:email, :username, :name, :password])
+      |> validate_password(opts)
+      |> validate_email(opts)
+    changeset
+  end
 end

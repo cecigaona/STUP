@@ -11,7 +11,9 @@ defmodule StupWeb.UserRegistrationApiController do
         |> put_status(:created)
         |> render(:new, %{user: user})
       {:error, %Ecto.Changeset{} = changeset} ->
-        render(conn, :new, changeset: changeset)
+        conn
+        |> put_status(:unprocessable_entity)
+        |> render(:new, changeset: changeset)
     end
   end
 

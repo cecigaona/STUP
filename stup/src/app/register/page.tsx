@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -12,23 +13,49 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      setError("Passwords do not match");
       return;
     }
 
     setIsLoading(true);
-    // TODO: replace with your real API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
 
-    // After a successful register, navigate as needed:
-    // router.push("/dashboard");
-    router.push("/login");
+    try {
+      const { response, data } = await api.register({
+        username,
+        name,
+        email,
+        password
+      });
+
+      if (response.ok) {
+        router.push("/login");
+      } else {
+        if (data.errors) {
+          const errorMessages = [];
+          for (const [field, messages] of Object.entries(data.errors)) {
+            if (Array.isArray(messages)) {
+              errorMessages.push(`${field}: ${messages.join(', ')}`);
+            } else {
+              errorMessages.push(`${field}: ${messages}`);
+            }
+          }
+          setError(errorMessages.join('; '));
+        } else {
+          setError('Registration failed');
+        }
+      }
+    } catch (err) {
+      setError('Failed to connect to server');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const goLogin = () => router.push("/login");
@@ -98,7 +125,7 @@ export default function RegisterPage() {
           <div>
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Password (min. 6 characters)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-6 py-4 bg-white/80 backdrop-blur-sm rounded-full border-0 
@@ -147,6 +174,12 @@ export default function RegisterPage() {
               "Register"
             )}
           </button>
+
+          {error && (
+            <div className="text-red-600 text-sm text-center mt-4">
+              {error}
+            </div>
+          )}
         </form>
 
         <div className="text-center mt-8">

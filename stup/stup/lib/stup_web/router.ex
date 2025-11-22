@@ -63,6 +63,13 @@ defmodule StupWeb.Router do
     pipe_through [:fetch_current_scope_for_api_user]
 
     get "/users/me", UserSessionApiController, :get
+
+    # Stock market endpoints (protected)
+    get "/stocks/quote/:symbol", StocksController, :quote
+    get "/stocks/search", StocksController, :search
+    get "/stocks/intraday/:symbol", StocksController, :intraday
+    get "/stocks/market-movers", StocksController, :market_movers
+    get "/stocks/popular", StocksController, :popular
   end
 
   scope "/", StupWeb do

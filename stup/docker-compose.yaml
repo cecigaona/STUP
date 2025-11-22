@@ -28,10 +28,12 @@ services:
       DATABASE_URL: "ecto://postgres:postgres@db:5432/stup_dev"
       SECRET_KEY_BASE: "dev-secret-key-base-change-me"
       FILE_SYSTEM_BACKEND: "fs_poll"
+      # Get your free API key from: https://www.alphavantage.co/support/#api-key
+      ALPHA_VANTAGE_API_KEY: "0US4TQIJHU0VRPDB"
     ports:
       - "4000:4000"
     volumes:
-      - ./stup:/app             
+      - ./stup:/app
       - mix-deps:/app/deps
       - mix-build:/app/_build
     depends_on:

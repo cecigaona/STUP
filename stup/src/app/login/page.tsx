@@ -2,33 +2,41 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
-    // TODO: replace this with your real auth call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const { response, data } = await api.login(email, password);
 
-    setIsLoading(false);
-
-    // In your old app you called onLogin(username). Here we just route:
-    router.push("/dashboard");
+      if (response.ok) {
+        // Store the token in localStorage
+        const token = data.data?.token || data.token;
+        if (token) {
+          localStorage.setItem('auth_token', token);
+        }
+        router.push("/dashboard");
+      } else {
+        setError(data.errors?.detail || 'Login failed');
+      }
+    } catch (err) {
+      setError('Failed to connect to server');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleGoogleLogin = () => {
-    // If you have NextAuth or a custom route, point to it here:
-    // window.location.href = "/api/auth/signin/google";
-    // or use an env var you expose as NEXT_PUBLIC_GOOGLE_AUTH_URL
-    console.log("Google login clicked");
-  };
 
   const goRegister = () => router.push("/register");
 
@@ -48,17 +56,17 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-6 py-4 bg-white/80 backdrop-blur-sm rounded-full border-0 
                          text-gray-700 placeholder-gray-500 text-lg
                          focus:outline-none focus:ring-2 focus:ring-[#145147]/30 focus:bg-white
                          transition-all duration-300 ease-in-out
                          shadow-sm hover:shadow-md"
               required
-              autoComplete="username"
+              autoComplete="email"
             />
           </div>
 
@@ -99,23 +107,11 @@ export default function LoginPage() {
             )}
           </button>
 
-          <div className="flex items-center justify-center my-8">
-            <span className="text-gray-500 text-sm">or</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full bg-white/90 backdrop-blur-sm text-gray-700 py-4 rounded-full text-lg font-medium
-                       hover:bg-white hover:shadow-lg active:bg-gray-50
-                       focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-[#F3E7D2]
-                       transition-all duration-300 ease-in-out
-                       shadow-md hover:shadow-xl active:shadow-sm
-                       transform hover:-translate-y-0.5 active:translate-y-0
-                       border border-gray-200/50"
-          >
-            Log in with Google
-          </button>
+          {error && (
+            <div className="text-red-600 text-sm text-center mt-4">
+              {error}
+            </div>
+          )}
         </form>
 
         <div className="text-center mt-8">

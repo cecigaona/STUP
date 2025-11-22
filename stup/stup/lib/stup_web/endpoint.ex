@@ -50,5 +50,13 @@ defmodule StupWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+
+  # CORS configuration for API endpoints
+  plug CORSPlug,
+    origin: ["http://localhost:5173", "http://localhost:3000"],
+    credentials: true,
+    max_age: 86400,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
   plug StupWeb.Router
 end

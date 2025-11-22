@@ -1,20 +1,17 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Menu, X, Send } from "lucide-react";
+import { Menu, X, Send, TrendingUp, TrendingDown } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
+import { stocksApi, StockQuote } from "@/lib/stocksApi";
 
 export default function Page() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<"home" | "search" | "portfolio">("home");
 
-  // Username (hidrata desde localStorage si existe)
-  const [userName, setUserName] = useState<string>("User");
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("userName");
-      if (stored) setUserName(stored);
-    } catch {}
-  }, []);
+  // Authentication
+  const { user, loading, logout } = useAuth(true);
+  const userName = user?.name || user?.username || user?.email?.split('@')[0] || "User";
 
   // ---------------- Chat ----------------
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -126,14 +123,62 @@ export default function Page() {
     );
   };
 
-  // ---------------- Data ----------------
-  const stockData = [
-    { name: "TechCorp", price: "$150.25", change: "+2.5%", volume: "1.2M", isPositive: true },
-    { name: "Innovate Solutions", price: "$220.50", change: "-1.8%", volume: "850K", isPositive: false },
-    { name: "Global Energy", price: "$85.75", change: "+0.7%", volume: "2.5M", isPositive: true },
-    { name: "HealthFirst", price: "$310.00", change: "+3.2%", volume: "600K", isPositive: true },
-    { name: "FinServ Group", price: "$112.80", change: "-0.5%", volume: "1.5M", isPositive: false },
-  ];
+  // ---------------- Stock Data ----------------
+  const [stockData, setStockData] = useState<StockQuote[]>([]);
+  const [stocksLoading, setStocksLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  // Fetch popular stocks on component mount
+  useEffect(() => {
+    fetchPopularStocks();
+  }, []);
+
+  const fetchPopularStocks = async () => {
+    setStocksLoading(true);
+    try {
+      const { response, data } = await stocksApi.getPopularStocks();
+      if (response.ok && data.data) {
+        setStockData(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stocks:', error);
+      // Use mock data as fallback
+      setStockData([
+        { symbol: "AAPL", price: 150.25, change: 2.5, change_percent: "+1.7%", volume: 1200000, open: 148, high: 151, low: 147, previous_close: 147.75, latest_trading_day: "2024-01-01" },
+        { symbol: "GOOGL", price: 220.50, change: -1.8, change_percent: "-0.8%", volume: 850000, open: 222, high: 223, low: 219, previous_close: 222.30, latest_trading_day: "2024-01-01" },
+        { symbol: "MSFT", price: 385.75, change: 0.7, change_percent: "+0.2%", volume: 2500000, open: 385, high: 387, low: 383, previous_close: 385.05, latest_trading_day: "2024-01-01" },
+      ]);
+    } finally {
+      setStocksLoading(false);
+    }
+  };
+
+  const searchStocks = async () => {
+    if (!searchQuery.trim()) return;
+    try {
+      const { response, data } = await stocksApi.searchStocks(searchQuery);
+      if (response.ok && data.data) {
+        setSearchResults(data.data);
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+    }
+  };
+
+  const formatVolume = (volume: number) => {
+    if (volume >= 1000000) return `${(volume / 1000000).toFixed(1)}M`;
+    if (volume >= 1000) return `${(volume / 1000).toFixed(0)}K`;
+    return volume.toString();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F3E7D2] flex items-center justify-center">
+        <div className="text-[#145147] text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F3E7D2] relative">
@@ -146,9 +191,8 @@ export default function Page() {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 left-0 h-full w-80 bg-[#145147] text-white transform transition-transform duration-300 ease-in-out z-40 ${
-          isMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed top-0 left-0 h-full w-80 bg-[#145147] text-white transform transition-transform duration-300 ease-in-out z-40 ${isMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="p-8 pt-20">
           <h2 className="text-2xl font-bold mb-8">STUP</h2>
@@ -179,6 +223,15 @@ export default function Page() {
               className={`w-full text-left p-4 rounded-lg ${currentPage === "portfolio" ? "bg-white/20" : "hover:bg-white/10"}`}
             >
               Portfolio Actions
+            </button>
+            <button
+              onClick={() => {
+                logout();
+                setIsMenuOpen(false);
+              }}
+              className="w-full text-left p-4 rounded-lg hover:bg-white/10 text-red-300 hover:text-white mt-8"
+            >
+              Log Out
             </button>
           </nav>
         </div>
@@ -212,11 +265,10 @@ export default function Page() {
             {chatMessages.map((message) => (
               <div key={message.id} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[80%] p-3 rounded-2xl ${
-                    message.isUser
+                  className={`max-w-[80%] p-3 rounded-2xl ${message.isUser
                       ? "bg-white text-gray-800 rounded-br-md"
                       : "bg-[#F3E7D2] text-gray-800 rounded-bl-md"
-                  }`}
+                    }`}
                 >
                   <p className="text-sm">{message.text}</p>
                 </div>
@@ -289,36 +341,64 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Stocks Table (con colores originales) */}
+            {/* Stocks Table with Real Data */}
             <div className="bg-[#F3E7D2] rounded-2xl overflow-hidden shadow-xl border border-gray-200">
-              <div className="bg-[#145147] px-6 py-4">
-                <div className="grid grid-cols-5 gap-4 text-white font-medium">
-                  <div>Stock</div>
+              <div className="bg-[#145147] px-6 py-4 flex justify-between items-center">
+                <div className="grid grid-cols-5 gap-4 text-white font-medium flex-1">
+                  <div>Symbol</div>
                   <div>Price</div>
                   <div>Change</div>
                   <div>Volume</div>
                   <div>Action</div>
                 </div>
+                <button
+                  onClick={fetchPopularStocks}
+                  disabled={stocksLoading}
+                  className="text-white hover:text-green-300 transition-colors ml-4"
+                >
+                  {stocksLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    <span className="text-sm">↻ Refresh</span>
+                  )}
+                </button>
               </div>
 
               <div className="divide-y divide-gray-300">
-                {stockData.map((stock, index) => (
-                  <div key={index} className="px-6 py-4 hover:bg-white/50 transition-colors duration-200">
-                    <div className="grid grid-cols-5 gap-4 items-center">
-                      <div className="text-[#145147] font-medium">{stock.name}</div>
-                      <div className="text-gray-700">{stock.price}</div>
-                      <div className={`font-medium ${stock.isPositive ? "text-green-400" : "text-red-400"}`}>
-                        {stock.change}
-                      </div>
-                      <div className="text-gray-600">{stock.volume}</div>
-                      <div>
-                        <button className="text-gray-600 hover:text-[#145147] transition-colors duration-200 font-medium">
-                          View
-                        </button>
+                {stocksLoading && stockData.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-gray-600">
+                    Loading real-time stock data...
+                  </div>
+                ) : stockData.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-gray-600">
+                    No stock data available. Please try again later.
+                  </div>
+                ) : (
+                  stockData.map((stock, index) => (
+                    <div key={index} className="px-6 py-4 hover:bg-white/50 transition-colors duration-200">
+                      <div className="grid grid-cols-5 gap-4 items-center">
+                        <div className="text-[#145147] font-bold">{stock.symbol}</div>
+                        <div className="text-gray-700">${stock.price.toFixed(2)}</div>
+                        <div className={`font-medium flex items-center ${stock.change >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {stock.change >= 0 ? <TrendingUp size={16} className="mr-1" /> : <TrendingDown size={16} className="mr-1" />}
+                          ${Math.abs(stock.change).toFixed(2)} ({stock.change_percent})
+                        </div>
+                        <div className="text-gray-600">{formatVolume(stock.volume)}</div>
+                        <div>
+                          <button
+                            onClick={() => {
+                              setCurrentPage("search");
+                              setSearchQuery(stock.symbol);
+                            }}
+                            className="text-gray-600 hover:text-[#145147] transition-colors duration-200 font-medium"
+                          >
+                            View
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </>
@@ -334,20 +414,43 @@ export default function Page() {
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search for stocks"
+                  placeholder="Search for stocks (e.g., AAPL, MSFT, TSLA)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchStocks()}
                   className="bg-transparent text-gray-300 placeholder-gray-500 flex-1 outline-none text-lg"
                 />
+                <button
+                  onClick={searchStocks}
+                  className="ml-2 px-4 py-1 bg-[#145147] text-white rounded-lg hover:bg-[#0f3d37] transition-colors"
+                >
+                  Search
+                </button>
               </div>
             </div>
 
-            {/* Breadcrumb */}
-            <div className="mb-6">
-              <div className="bg-[#2a3a3a] rounded-lg p-4">
-                <div className="text-gray-400 text-sm mb-2">Stocks / Tech</div>
-                <h1 className="text-white text-3xl font-bold mb-1">Tech Inc.</h1>
-                <div className="text-gray-400">NASDAQ: TCH</div>
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="mb-6">
+                <div className="bg-[#2a3a3a] rounded-lg p-4">
+                  <h3 className="text-white text-lg font-semibold mb-3">Search Results</h3>
+                  <div className="space-y-2">
+                    {searchResults.slice(0, 5).map((result, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                        <div>
+                          <div className="text-white font-medium">{result.symbol}</div>
+                          <div className="text-gray-400 text-sm">{result.name}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-gray-300 text-sm">{result.type}</div>
+                          <div className="text-gray-400 text-xs">{result.region}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Tabs */}
             <div className="mb-6">
@@ -564,11 +667,10 @@ export default function Page() {
 
                 {orderSubmitted && (
                   <div
-                    className={`text-sm px-3 py-2 rounded-lg ${
-                      orderSubmitted.startsWith("Please")
+                    className={`text-sm px-3 py-2 rounded-lg ${orderSubmitted.startsWith("Please")
                         ? "bg-red-50 text-red-700 border border-red-200"
                         : "bg-green-50 text-green-700 border border-green-200"
-                    }`}
+                      }`}
                   >
                     {orderSubmitted}
                   </div>

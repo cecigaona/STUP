@@ -70,6 +70,12 @@ defmodule StupWeb.Router do
     get "/stocks/intraday/:symbol", StocksController, :intraday
     get "/stocks/market-movers", StocksController, :market_movers
     get "/stocks/popular", StocksController, :popular
+
+    # Portfolio endpoints (protected)
+    get "/portfolio", PortfolioController, :index
+    post "/portfolio/buy", PortfolioController, :buy
+    post "/portfolio/sell", PortfolioController, :sell
+    get "/portfolio/transactions", PortfolioController, :transactions
   end
 
   scope "/", StupWeb do
